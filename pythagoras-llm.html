@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pythagoras LLM Search Predictor</title>
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+    }
+   .container {
+        background: rgba(0,0,0,0.6);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 0 20px #00f2fe;
+        width: 90%;
+        max-width: 700px;
+    }
+    h1 { text-align: center; color: #00f2fe; }
+    input {
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        border: none;
+        font-size: 16px;
+        margin-bottom: 15px;
+        background: #1a1a1a;
+        color: #fff;
+    }
+    button {
+        width: 100%;
+        padding: 12px;
+        background: #00f2fe;
+        color: #000;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    button:hover { background: #4facfe; }
+   .output {
+        margin-top: 20px;
+        background: #111;
+        padding: 15px;
+        border-radius: 8px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+   .tag { color: #4facfe; }
+   .val { color: #f093fb; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>🧠 Pythagoras LLM Predictor</h1>
+    <input type="text" id="query" placeholder="Type: I going to the market">
+    <button onclick="predict()">Predict Next Words</button>
+    <div class="output" id="output"></div>
+</div>
+
+<script>
+// ========== CORE AI LOGIC ==========
+const COUNTRY_CONSTANT = "NGA"; // constant for matrix
+
+function asciiValue(char) {
+    return char.charCodeAt(0); // both small and capital
+}
+
+function nameFrequency(str) {
+    return str.split('').filter(c=>/[a-zA-Z]/.test(c))
+             .reduce((sum,c)=>sum+asciiValue(c),0) % 100;
+}
+
+function pythagorasMod(a, b) {
+    // a = opp, b = hyp for sin
+    if(b === 0) return 0;
+    const sin = (a % b); // using % instead of /
+    const cos = (b % a) || 1; // avoid div by 0
+    const tan = (a % cos) || 1;
+    return {sin, cos, tan, hyp: Math.sqrt(a*a + b*b)};
+}
+
+function generateMatrix(sin, cos, tan, nameFreq) {
+    // 3x3 matrix with country constant
+    return [
+        [sin, cos, nameFreq],
+        [tan, COUNTRY_CONSTANT.length, sin],
+        [nameFreq, cos, COUNTRY_CONSTANT.length]
+    ];
+}
+
+function predictNextWords(query) {
+    let log = "";
+    const words = query.trim().split(/\s+/);
+    if(words.length < 2) return "Need at least 2 words";
+
+    log += `Input: <span class="val">${query}</span>\n`;
+    log += `Words: <span class="val">${words.join(", ")}</span>\n\n`;
+
+    let remainder = 0;
+    let vectors = [];
+
+    // Step 1: Process every 2 words
+    for(let i=0; i<words.length-1; i+=2){
+        const w1 = words[i], w2 = words[i+1];
+        const a = asciiValue(w1[0]); // first char of word1
+        const b = asciiValue(w2[0]); // first char of word2
+
+        log += `<span class="tag">Chunk ${i/2+1}</span>: "${w1} ${w2}" -> ASCII(${w1[0]})=${a}, ASCII(${w2[0]})=${b}\n`;
+
+        // Pythagoras rule: sine = opp % hyp
+        const trig = pythagorasMod(a, b);
+        log += ` sin=opp%hyp=${a}%${b}=${trig.sin}\n`;
+        log += ` cos=adj%hyp=${b}%${a}=${trig.cos}\n`;
+        log += ` tan=opp/adj=${a}%${trig.cos}=${trig.tan}\n`;
+
+        const nameFreq = nameFrequency(w1+w2);
+        const matrix = generateMatrix(trig.sin, trig.cos, trig.tan, nameFreq);
+        vectors.push(matrix);
+        log += ` NameFreq=${nameFreq}, Matrix[0][0]=${matrix[0][0]}\n\n`;
+
+        remainder = (remainder + trig.sin + trig.cos + trig.tan) % 97; // decentralized modulus 97
+    }
+
+    // Step 2: Beginning and End character cycle
+    const beginChar = asciiValue(query[0]);
+    const endChar = asciiValue(query[query.length-1]);
+    log += `<span class="tag">Begin%End</span>: ${beginChar}%${endChar}=${beginChar % endChar}\n`;
+    remainder = (remainder + (beginChar % endChar)) % 97;
+
+    // Step 3: Continue cycle until remainder = 0
+    let cycle = 0;
+    let predictions = [];
+    while(remainder!== 0 && cycle < 10){
+        const div = (remainder % (cycle+2)) || 1;
+        remainder = remainder % div;
+        const predictedChar = String.fromCharCode(97 + (remainder % 26)); // a-z
+        predictions.push(predictedChar);
+        log += `<span class="tag">Cycle ${cycle+1}</span>: rem%${div}=${remainder} -> char='${predictedChar}'\n`;
+        cycle++;
+    }
+
+    log += `\n<span class="tag">Final Prediction</span>: ${predictions.join("")}\n`;
+    log += `<span class="tag">Matrix Count</span>: ${vectors.length}\n`;
+
+    return log;
+}
+
+function predict() {
+    const query = document.getElementById('query').value;
+    const out = predictNextWords(query);
+    document.getElementById('output').innerHTML = out;
+}
+</script>
+</body>
+</html>
